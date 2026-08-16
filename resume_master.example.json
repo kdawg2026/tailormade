@@ -1,0 +1,46 @@
+{
+  "name": "JANE Q. EXAMPLE",
+  "tagline": "IT Support Specialist | CompTIA A+ Certified | Network+ Certified",
+  "contact": "Anytown, ST | 555-0100 | jane@example.com | linkedin.com/in/example",
+  "summary": "IT support specialist with hands-on experience in end-user support, troubleshooting, and maintaining secure environments. Skilled in Microsoft 365, networking, and hardware/software configuration.",
+  "competencies": [
+    "Networking: TCP/IP, DHCP, DNS, VPNs, Group Policy",
+    "Operating Systems: Windows 10/11, macOS, Linux",
+    "Hardware Support: PC/laptop setup, printer configuration, peripherals",
+    "Software Support: Microsoft 365, Google Workspace, Remote Desktop",
+    "Scripting: PowerShell, Bash"
+  ],
+  "experience": [
+    {
+      "title": "IT Support Technician",
+      "org_line": "Example Corp, Anytown, ST | March 2023 - Present",
+      "bullets": [
+        "Configure, test, and deploy software updates, patches, and drivers",
+        "Resolve end-user hardware and software issues across Windows and macOS",
+        "Document technical procedures to improve reliability and response times"
+      ]
+    },
+    {
+      "title": "Help Desk Associate",
+      "org_line": "Sample Services LLC, Anytown, ST | June 2021 - March 2023",
+      "bullets": [
+        "Supported staff with account access, printing, and connectivity issues",
+        "Maintained asset records ensuring accuracy and compliance",
+        "Trained new team members to improve workflow and support quality"
+      ]
+    }
+  ],
+  "certifications": [
+    "CompTIA A+ (Valid through 09/2028)",
+    "CompTIA Network+ (Valid through 02/2029)"
+  ],
+  "education": [
+    "Example State University - B.S., Information Sciences, 2021"
+  ],
+  "projects": [
+    {
+      "title": "Home Lab Monitoring Dashboard -- example.com",
+      "description": "Built a small dashboard tracking uptime and resource use across a home lab. Includes database management and API integrations."
+    }
+  ]
+}

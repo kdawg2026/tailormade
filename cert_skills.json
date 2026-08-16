@@ -1,0 +1,77 @@
+{
+  "_comment": "Skills attested by certifications on the resume, sourced from official CompTIA exam objectives. The tailoring script may surface these as cert-backed knowledge when a job description requires them, but never as claimed work experience.",
+  "certs": [
+    {
+      "name": "CompTIA A+ (Core 1: 220-1101, Core 2: 220-1102)",
+      "skills": [
+        "PC, laptop, and mobile device hardware installation, configuration, and troubleshooting",
+        "Hardware components: motherboards, CPUs, RAM, storage devices, power supplies",
+        "Printer and peripheral installation, configuration, and maintenance",
+        "Networking fundamentals: network types, hardware devices, SOHO network configuration",
+        "Virtualization and cloud computing concepts (client-side virtualization, cloud models)",
+        "Operating system installation, configuration, and maintenance: Windows, macOS, Linux, ChromeOS, Android, iOS",
+        "Windows administration: Control Panel, settings, command-line tools, user account management",
+        "Security fundamentals: physical security, wireless security (WPA2/WPA3), malware detection and removal",
+        "Workstation and data security best practices, screen locks, encryption basics",
+        "Software troubleshooting for desktop and mobile OS, applications, and security issues",
+        "Operational procedures: documentation, ticketing systems, asset management and inventory tracking, change management",
+        "Safety procedures, ESD precautions, environmental controls",
+        "Communication skills, professionalism, and customer service in IT support",
+        "Basics of scripting (batch, PowerShell, Bash, Python awareness), remote access technologies (RDP, SSH, VPN, VNC)",
+        "Backup and recovery methods, disaster prevention"
+      ]
+    },
+    {
+      "name": "CompTIA Network+ (N10-008/N10-009)",
+      "skills": [
+        "OSI model and network protocol analysis",
+        "Common ports, protocols, services, and traffic types (TCP/UDP, HTTP/S, DNS, DHCP, SMB, SNMP, syslog)",
+        "IP addressing and subnetting (IPv4/IPv6), VLANs, network segmentation",
+        "Routing and switching concepts and configuration (static/dynamic routing, STP, trunking)",
+        "Wireless networking: standards, device selection, configuration, and security",
+        "Network appliances: firewalls, load balancers, proxies, IDS/IPS",
+        "Transmission media, transceivers, and structured cabling",
+        "Network monitoring technologies, SNMP, flow data, packet capture, log review",
+        "Network documentation, change management, and configuration backups",
+        "High availability and disaster recovery concepts",
+        "Network security: zero trust concepts, defense-in-depth, secure configurations, common attacks and mitigations",
+        "Network hardening, access control lists, port security",
+        "Systematic network troubleshooting methodology for connectivity, DNS, routing, and performance issues",
+        "Command-line network tools: ping, traceroute, nslookup/dig, ipconfig/ifconfig, netstat, tcpdump"
+      ]
+    },
+    {
+      "name": "CompTIA Security+ (SY0-701)",
+      "skills": [
+        "Security controls: technical, managerial, operational, physical",
+        "Threats, vulnerabilities, and mitigations: malware, social engineering, application and network attacks",
+        "Vulnerability scanning, assessment, and remediation workflows",
+        "Security architecture: on-prem, hybrid, and cloud environments; IoT and OT considerations",
+        "Zero trust architecture and identity-centric security models",
+        "Identity and access management: authentication, authorization, MFA, SSO, least privilege, RBAC",
+        "Cryptography fundamentals: encryption at rest/in transit, PKI, certificates, hashing",
+        "Security operations: monitoring, SIEM concepts, log analysis, alerting and response",
+        "Incident response process: detection, analysis, containment, eradication, recovery, lessons learned",
+        "Digital forensics fundamentals and evidence handling",
+        "Hardening techniques for endpoints, servers, networks, and mobile devices",
+        "Data protection: classification, handling of sensitive data, data loss prevention concepts",
+        "Security awareness, policies, and procedures; enforcing established security protocols",
+        "Risk management, third-party risk, and compliance concepts (frameworks, audits, attestation)",
+        "Security program management, governance, and effective security reporting/communication",
+        "Automation and orchestration concepts supporting security operations"
+      ]
+    },
+    {
+      "name": "CompTIA IT Operations Specialist - CIOS (stackable: A+ + Network+)",
+      "skills": [
+        "Attests combined A+ and Network+ skill set: end-to-end IT operations support spanning endpoint hardware/software and network infrastructure"
+      ]
+    },
+    {
+      "name": "CompTIA Secure Infrastructure Specialist - CSIS (stackable: A+ + Network+ + Security+)",
+      "skills": [
+        "Attests combined A+, Network+, and Security+ skill set: securely deploying, operating, and supporting IT infrastructure"
+      ]
+    }
+  ]
+}

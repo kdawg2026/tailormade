@@ -1,0 +1,20 @@
+# Personal data — never commit. Your real resume holds your phone number,
+# email, and address; the tailored output and job descriptions identify the
+# employers you are applying to.
+resume_master.json
+resume_master_v*.json
+approved_wording.json
+Tailored/
+jd.md
+jd.txt
+*.pdf
+*.docx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
