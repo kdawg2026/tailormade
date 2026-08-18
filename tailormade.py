@@ -36,6 +36,8 @@ import json
 import re
 import subprocess
 import sys
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from resume_checks import (
@@ -193,6 +195,26 @@ JOB DESCRIPTION:
 """
 
 
+@dataclass
+class Failure:
+    """A rejected draft, in a form both the operator and the model can read."""
+
+    header: str
+    items: list[str]
+    advice: str = ""
+
+    def as_feedback(self) -> str:
+        lines = "\n".join(f"- {item}" for item in self.items)
+        return (
+            "\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED. Fix these exact problems and\n"
+            "return the corrected JSON. Every rule above still applies.\n"
+            f"{self.header}\n{lines}\n"
+            "Where a job requirement is simply absent from the resume, drop the\n"
+            "wording entirely rather than rephrasing around it — silence passes,\n"
+            "clever paraphrase does not."
+        )
+
+
 def run_claude(prompt: str) -> str:
     result = subprocess.run(
         ["claude", "-p", "--output-format", "text"],
@@ -261,6 +283,12 @@ def main() -> int:
              "text frozen). Each rewrite is still checked against its own source bullet.",
     )
     parser.add_argument(
+        "--attempts",
+        type=int,
+        default=4,
+        help="How many times to let the model correct a rejected draft (default 4)",
+    )
+    parser.add_argument(
         "--approve-wording",
         default="",
         help="Comma-separated words to accept as sourced, now and in future runs",
@@ -289,18 +317,6 @@ def main() -> int:
         save_approved_wording(approved_path, approved)
         print(f"Recorded {len(newly_approved)} approved word(s) in {approved_path.name}.")
 
-    mode = "rephrase" if args.rewrite_bullets else "verbatim"
-    print(f"Tailoring resume with Claude (bullet mode: {mode})...")
-    prompt = PROMPT_TEMPLATE.format(
-        master_json=json.dumps(master, indent=2),
-        cert_skills_json=json.dumps(cert_skills["certs"], indent=2),
-        bullet_rule=BULLET_RULE_REWRITE if args.rewrite_bullets else BULLET_RULE_VERBATIM,
-        job_description=jd_text,
-    )
-    response = parse_model_json(run_claude(prompt))
-    tailored = response["resume"]
-    letter_body = response.get("cover_letter", "").strip()
-
     def fail(header: str, items: list[str], advice: str = "") -> int:
         print(header, file=sys.stderr)
         for item in items:
@@ -309,63 +325,108 @@ def main() -> int:
             print(f"\n{advice}", file=sys.stderr)
         return 1
 
-    problems = validate(master, tailored)
-    if problems:
-        return fail("Validation failed — tailored output altered protected fields:", problems)
+    mode = "rephrase" if args.rewrite_bullets else "verbatim"
+    print(f"Tailoring resume with Claude (bullet mode: {mode})...")
+    base_prompt = PROMPT_TEMPLATE.format(
+        master_json=json.dumps(master, indent=2),
+        cert_skills_json=json.dumps(cert_skills["certs"], indent=2),
+        bullet_rule=BULLET_RULE_REWRITE if args.rewrite_bullets else BULLET_RULE_VERBATIM,
+        job_description=jd_text,
+    )
 
-    # Each bullet must be a traceable transformation of one specific master
-    # bullet. This is the check that makes cross-employer fabrication impossible
-    # rather than merely discouraged.
-    provenance, notes = check_bullet_provenance(master, tailored, args.rewrite_bullets)
-    if provenance:
-        return fail(
-            "Validation failed — bullets are not traceable to the master:",
-            provenance,
-            "In verbatim mode bullet text may not change at all. Use\n"
-            "--rewrite-bullets to allow rephrasing within each bullet's own source.",
-        )
+    def run_checks(tailored: dict, letter_body: str) -> Failure | None:
+        """Run every anti-fabrication check, returning the first failure."""
+        problems = validate(master, tailored)
+        if problems:
+            return Failure(
+                "Validation failed — tailored output altered protected fields:",
+                problems,
+            )
 
-    inflated = check_seniority(master, tailored)
-    if inflated:
-        return fail("Validation failed — seniority was inflated above the source:", inflated)
+        # Each bullet must be a traceable transformation of one specific master
+        # bullet. This is the check that makes cross-employer fabrication
+        # impossible rather than merely discouraged.
+        provenance, _ = check_bullet_provenance(master, tailored, args.rewrite_bullets)
+        if provenance:
+            return Failure(
+                "Validation failed — bullets are not traceable to the master:",
+                provenance,
+                "In verbatim mode bullet text may not change at all. Use\n"
+                "--rewrite-bullets to allow rephrasing within each bullet's own source.",
+            )
 
-    invented = check_invented_numbers(master, tailored, letter_body)
-    if invented:
-        return fail(
-            "Validation failed — output invented quantities:",
-            invented,
-            "Metrics not in the master resume are fabrications. There is no override.",
-        )
+        inflated = check_seniority(master, tailored)
+        if inflated:
+            return Failure(
+                "Validation failed — seniority was inflated above the source:",
+                inflated,
+            )
 
-    leaks = check_cert_leak(master, cert_skills, tailored, letter_body)
-    if leaks:
-        return fail(
-            "Validation failed — certification knowledge presented as work experience:",
-            leaks,
-            "A certification proves the candidate was tested on something, not that\n"
-            "they did it on the job. Keep it in competencies with the cert named.",
-        )
+        invented = check_invented_numbers(master, tailored, letter_body)
+        if invented:
+            return Failure(
+                "Validation failed — output invented quantities:",
+                invented,
+                "Metrics not in the master resume are fabrications. There is no override.",
+            )
 
-    # The resume and the cover letter are held to the same standard: nothing in
-    # either may originate from the job description instead of the candidate.
-    claims = check_unverifiable_claims(master, tailored, letter_body)
-    if claims:
-        return fail(
-            "Validation failed — output asserts things it cannot know:",
-            claims,
-            "These may well be true, but only you can confirm them. Add them\n"
-            "by hand after verifying; the model must not assert them unprompted.",
-        )
+        leaks = check_cert_leak(master, cert_skills, tailored, letter_body)
+        if leaks:
+            return Failure(
+                "Validation failed — certification knowledge presented as work experience:",
+                leaks,
+                "A certification proves the candidate was tested on something, not that\n"
+                "they did it on the job. Keep it in competencies with the cert named.",
+            )
 
-    unsourced = check_grounding(master, cert_skills, tailored, letter_body, approved)
-    if unsourced:
-        return fail(
-            "Unsourced wording — not found in the resume or cert objectives:",
-            unsourced,
-            "Review each word above. Harmless connective phrasing can be accepted\n"
-            "permanently with --approve-wording word1,word2; anything describing\n"
-            "work performed must not be accepted — re-run instead.",
-        )
+        # The resume and the cover letter are held to the same standard: nothing
+        # in either may originate from the job description instead of the
+        # candidate.
+        claims = check_unverifiable_claims(master, tailored, letter_body)
+        if claims:
+            return Failure(
+                "Validation failed — output asserts things it cannot know:",
+                claims,
+                "These may well be true, but only you can confirm them. Add them\n"
+                "by hand after verifying; the model must not assert them unprompted.",
+            )
+
+        unsourced = check_grounding(master, cert_skills, tailored, letter_body, approved)
+        if unsourced:
+            return Failure(
+                "Unsourced wording — not found in the resume or cert objectives:",
+                unsourced,
+                "Review each word above. Harmless connective phrasing can be accepted\n"
+                "permanently with --approve-wording word1,word2; anything describing\n"
+                "work performed must not be accepted — re-run instead.",
+            )
+        return None
+
+    # The checks are strict by design, and a single generation often trips one
+    # of them. Rather than making the operator re-run by hand, feed the exact
+    # failure back to the model and let it correct itself.
+    tailored = None
+    letter_body = ""
+    failure: Failure | None = None
+    notes: list[str] = []
+    for attempt in range(1, args.attempts + 1):
+        prompt = base_prompt if failure is None else base_prompt + failure.as_feedback()
+        label = "correcting last failure" if failure else "first draft"
+        print(f"Attempt {attempt}/{args.attempts} ({label}) — calling claude...", flush=True)
+        started = time.monotonic()
+        raw = run_claude(prompt)
+        print(f"  model replied in {time.monotonic() - started:.0f}s", flush=True)
+        response = parse_model_json(raw)
+        tailored = response["resume"]
+        letter_body = response.get("cover_letter", "").strip()
+        failure = run_checks(tailored, letter_body)
+        if failure is None:
+            _, notes = check_bullet_provenance(master, tailored, args.rewrite_bullets)
+            break
+        print(f"  rejected: {failure.header}", file=sys.stderr, flush=True)
+
+    if failure is not None:
+        return fail(failure.header, failure.items, failure.advice)
 
     for note in notes:
         print(note)

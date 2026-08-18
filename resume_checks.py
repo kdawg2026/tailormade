@@ -74,9 +74,16 @@ def _stem(word: str) -> str:
     return word
 
 
+# Stopwords are filtered again after stemming, or an inflection slips through:
+# "experience" is a stopword and never enters the allowed set, while
+# "experienced" is not one, stems to "experienc", and gets flagged as unsourced.
+_STOPWORD_STEMS = {_stem(w) for w in _STOPWORDS}
+
+
 def _content_stems(text: str) -> set[str]:
     words = re.findall(r"[a-zA-Z0-9+#/]{3,}", text.lower())
-    return {_stem(w) for w in words if w not in _STOPWORDS}
+    stems = {_stem(w) for w in words if w not in _STOPWORDS}
+    return stems - _STOPWORD_STEMS
 
 
 def _collect_text(value) -> str:
