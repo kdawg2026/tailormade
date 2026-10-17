@@ -4,6 +4,9 @@
 resume_master.json
 resume_master_v*.json
 approved_wording.json
+.env
+.env*
+.vercel
 Tailored/
 jd.md
 jd.txt
@@ -18,3 +21,6 @@ venv/
 
 # macOS
 .DS_Store
+
+.vercel
+.env*

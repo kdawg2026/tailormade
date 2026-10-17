@@ -9,7 +9,7 @@ Tailormade treats that as the central problem rather than a footnote. The model 
 ## What it does
 
 1. Reads your master resume (`resume_master.json`) and a job description.
-2. Asks Claude — via the `claude` CLI in headless mode — to reorder and, optionally, rephrase **existing** content toward that posting.
+2. Asks DeepSeek — via its chat-completions API — to reorder and, optionally, rephrase **existing** content toward that posting.
 3. Runs seven independent checks against the response. Any failure aborts before rendering.
 4. Renders a DOCX and a PDF of both the resume and a cover letter, named for the company and role:
    `Jane Example - Penn State ARL - IT Support Specialist.pdf`
@@ -64,7 +64,7 @@ A pattern only counts as a violation when your master resume doesn't already use
 
 ### Everything else stays inside your own vocabulary
 
-The summary, tagline, competencies, project descriptions, and cover letter are checked word-by-word against your resume and cert objectives. Anything novel is surfaced for review.
+The tagline, competencies, and project descriptions are checked word-by-word against your resume and cert objectives. The summary and cover letter are prose, so they may use ordinary English, but any wording lifted from the job description, or any capitalized tool or product name, must still be in your resume or cert objectives. That is where a letter's fabrications come from: echoing the posting's requirements back as if you had them.
 
 Harmless connective phrasing gets accepted permanently:
 
@@ -81,7 +81,7 @@ Employers, job titles, dates, certifications, education, your name, contact line
 ## Requirements
 
 - Python 3.10+
-- The [`claude` CLI](https://claude.com/claude-code), authenticated and on your `PATH`
+- A [DeepSeek API key](https://platform.deepseek.com/api_keys), set as `DEEPSEEK_API_KEY` in your environment or in a `.env` file next to `tailormade.py` (gitignored): `DEEPSEEK_API_KEY=sk-...`
 - `pip install python-docx reportlab`
 
 ## Setup
@@ -106,7 +106,8 @@ $EDITOR resume_master.json
 python3 tailormade.py job_description.txt
 
 # Paste the posting from your clipboard
-pbpaste | python3 tailormade.py -
+pbpaste | python3 tailormade.py -          # macOS
+Get-Clipboard | python tailormade.py -      # Windows PowerShell
 
 # Allow rephrasing, still scoped per source bullet
 python3 tailormade.py job_description.txt --rewrite-bullets
@@ -119,6 +120,41 @@ python3 tailormade.py jd.txt --master other_master.json --outdir Applications
 ```
 
 Output lands in `Tailored/`: resume DOCX + PDF, cover letter DOCX + PDF.
+
+## Web app (hosted, paid)
+
+The web app is a FastAPI service (`app.py`) deployed to Vercel, with Neon Postgres for accounts and credits and Stripe for payments.
+
+| Plan | Price | Tailors |
+|------|-------|---------|
+| Free | $0 | 5 per account, once |
+| Pack | $10 / $22 | 15 / 45, never expire |
+| Monthly | $9/month | 60 per billing period, no rollover |
+
+Free tailors are spent first, then the monthly allowance, then pack credits. A credit is reserved when a tailor starts and refunded if no attempt passes every check, so users pay only for finished documents. Resume imports are free but limited to 10 per account per day, since each is a model call.
+
+Credits come only from verified Stripe webhooks, never from the checkout redirect. Each event and each pack purchase is applied once; refunds take pack credits back, and disputes or early fraud warnings pause paid use (`billing_hold`).
+
+Accounts are email + password: scrypt hashes, server-side sessions in an HttpOnly cookie (only the token's SHA-256 is stored), a 15-minute lock after 5 wrong passwords, and one account per network, ever (IPv4 address or IPv6 /64, stored as an HMAC keyed by `IP_HASH_SECRET`, and kept after an account is deleted). Signups from VPN, proxy, Tor, hosting, or compromised networks are refused using proxycheck.io (`PROXYCHECK_API_KEY` raises the keyless 100/day limit to 1,000/day); if proxycheck can't answer, signup is refused.
+
+Every DeepSeek call is logged in `api_calls` (user, tailor or import, tokens, estimated cost, duration, success). `SELECT * FROM api_usage_by_user` gives one row per user: calls, failed calls, tailor runs, tailors charged, tokens, and total cost. There is no email verification or password reset yet — both need a sending domain (Resend is provisioned but not configured).
+
+### Setup
+
+```bash
+vercel link && vercel env pull       # DATABASE_URL, STRIPE_SECRET_KEY, ...
+vercel env add DEEPSEEK_API_KEY      # also put it in .env for local runs
+pip install -r requirements.txt uvicorn
+python db.py migrate                 # create tables
+python billing.py setup              # create Stripe products and prices
+python billing.py webhook https://YOUR-PRODUCTION-HOST
+vercel env add STRIPE_WEBHOOK_SECRET # the secret the previous command printed
+uvicorn app:app --port 8000          # local: http://127.0.0.1:8000
+```
+
+Set `APP_HOSTS` (comma-separated) when you add a custom domain; requests for any other host are refused. Every page is served with a strict Content-Security-Policy, and POSTs must come from the same origin as JSON.
+
+Only certifications listed in your resume's `certifications` are used from `cert_skills.json`, so someone without a CompTIA cert is never credited with one.
 
 ## When it fails
 
@@ -138,9 +174,18 @@ Re-run it. Models are non-deterministic, and a run that drifts once usually does
 
 | File | Role |
 |------|------|
-| `tailormade.py` | Prompt construction, CLI, pipeline |
+| `tailormade.py` | Prompt construction, `tailor()` pipeline, CLI |
 | `resume_checks.py` | Every anti-fabrication check |
 | `resume_render.py` | DOCX and PDF rendering |
+| `resume_import.py` | Uploaded resume file to master-resume JSON |
+| `app.py` | Web app (FastAPI): pages, accounts, streamed import/tailor, billing routes |
+| `db.py` | Postgres schema and credit accounting |
+| `auth.py` | Passwords and sessions |
+| `billing.py` | Stripe products, checkout, portal, webhooks |
+| `web/index.html`, `web/app.js` | Web front end |
+| `web/account.html`, `web/account.js` | Account settings: cancel or keep the monthly plan, change password, delete account |
+| `web/docs.html` | Documentation page |
+| `web/style.css` | Styles shared by both pages |
 | `resume_master.json` | Your resume as data (gitignored) |
 | `cert_skills.json` | Certification exam objectives |
 | `approved_wording.json` | Wording you've reviewed and accepted (gitignored) |

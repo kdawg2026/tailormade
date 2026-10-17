@@ -41,6 +41,7 @@ UNVERIFIABLE_CLAIM_PATTERNS = [
 _STOPWORDS = {
     "and", "the", "for", "with", "that", "this", "from", "have", "has", "had",
     "are", "was", "were", "been", "being", "not", "into", "onto", "any",
+    "these", "those",
     "all", "our", "your", "their", "its", "his", "her", "them", "they", "you",
     "who", "which", "when", "where", "what", "how", "why", "can", "will",
     "would", "could", "should", "may", "might", "must", "than", "then", "such",
@@ -49,8 +50,13 @@ _STOPWORDS = {
     "between", "through", "during", "while", "before", "after", "above",
     "below", "out", "off", "again", "further", "once", "here", "there", "role",
     "team", "work", "working", "job", "position", "candidate", "experience",
+    "experienced",
     "including", "include", "includes", "using", "used", "use", "well", "new",
     "within", "toward", "towards", "per", "via", "etc", "eg", "ie",
+    "but", "yet", "does", "did", "doing", "done", "need", "needs", "rather",
+    "though", "although", "because", "since", "even", "still", "every", "already",
+    "current", "currently", "early", "clear", "clearly", "make", "makes", "keep",
+    "like", "way", "ways", "part", "able", "whether", "whose", "upon", "among",
 }
 
 
@@ -62,6 +68,10 @@ _LONG_SUFFIXES = ("ment", "ance", "ence")
 
 def _stem(word: str) -> str:
     """Crude suffix stripping so 'configure'/'configuring' compare as equal."""
+    # "reliability" and "reliable" must land together; the generic rules below
+    # would leave "reliabil" and "reliabl".
+    if word.endswith("bility") and len(word) >= 9:
+        word = word[:-5] + "le"
     for suffix in ("ations", "ation", "ingly", "ing", "ies", "ied", "ers", "er",
                    "ed", "es", "s", "ly", *_LONG_SUFFIXES):
         minimum = 5 if suffix in _LONG_SUFFIXES else 4
@@ -81,7 +91,8 @@ _STOPWORD_STEMS = {_stem(w) for w in _STOPWORDS}
 
 
 def _content_stems(text: str) -> set[str]:
-    words = re.findall(r"[a-zA-Z0-9+#/]{3,}", text.lower())
+    # "/" separates words ("cloud/database"), so it is not part of a token.
+    words = re.findall(r"[a-zA-Z0-9+#]{3,}", text.lower())
     stems = {_stem(w) for w in words if w not in _STOPWORDS}
     return stems - _STOPWORD_STEMS
 
@@ -285,12 +296,15 @@ def check_seniority(master: dict, tailored: dict) -> list[str]:
         entries, _ = bullet_entries(job, master_job)
         for entry in entries:
             index = entry["source_index"]
-            if not isinstance(index, int) or index >= len(master_job["bullets"]):
+            if not isinstance(index, int) or not 0 <= index < len(master_job["bullets"]):
                 continue
             source = master_job["bullets"][index]
             source_tier, _ = _seniority_tier(source)
             text_tier, claimed = _seniority_tier(entry["text"])
-            if source_tier and text_tier > source_tier:
+            # A source with no ranked verb is not a free pass: "Maintained
+            # databases" rewritten as "Directed databases" is still a promotion,
+            # and "direct" is a neutral stem the provenance check lets through.
+            if text_tier > source_tier:
                 problems.append(
                     f"{master_job['title']}: seniority inflated to {claimed!r}\n"
                     f"      source: {source}\n      returned: {entry['text']}"
@@ -352,6 +366,8 @@ def _is_quantity_claim(text: str, match: re.Match) -> bool:
 
     if re.match(r"\s*(%|\+|x\b|-fold)", trailing, flags=re.IGNORECASE):
         return True
+    if leading.endswith("$"):
+        return True
     if re.search(rf"\b({_LABEL_WORDS})[\s\-‑]*$", leading, flags=re.IGNORECASE):
         return False
     if re.match(rf"\s*({_MAGNITUDE_WORDS})\b", trailing, flags=re.IGNORECASE):
@@ -365,11 +381,51 @@ def _is_quantity_claim(text: str, match: re.Match) -> bool:
 
 # ------------------------------------------------------- cert-leak checks ----
 
-# Trailing \b would never fire after a "+", so the boundary is only on the left.
-_CERT_MARKER = re.compile(
-    r"\b(A\+|Network\+|Security\+|CIOS|CSIS|CompTIA|certified|certification)",
-    flags=re.IGNORECASE,
-)
+_CERT_MARKER_WORDS = ("certified", "certification")
+
+
+def _cert_marker(cert_skills: dict) -> re.Pattern:
+    """Words that attribute a skill to a certification the candidate holds.
+
+    Built from cert_skills.json so that editing that file to match your own
+    credentials is enough. A name token counts when it carries a "+" ("A+") or
+    is a 3+ letter acronym-style word ("CompTIA", "CISSP"); "IT" is too common
+    to mark anything.
+    """
+    tokens = set(_CERT_MARKER_WORDS)
+    for cert in cert_skills.get("certs", []):
+        tokens |= _cert_name_tokens(cert.get("name", ""))
+    alternation = "|".join(re.escape(t) for t in sorted(tokens, key=len, reverse=True))
+    # Trailing \b would never fire after a "+", so the boundary is only on the left.
+    return re.compile(rf"\b({alternation})", flags=re.IGNORECASE)
+
+
+def _cert_name_tokens(name: str) -> set[str]:
+    """Distinctive tokens of a certification name: "A+", "CompTIA", "CIOS"."""
+    return {
+        token
+        for token in re.split(r"[\s\-–—/,:]+", name.split("(")[0])
+        if "+" in token or (len(token) >= 3 and sum(c.isupper() for c in token) >= 2)
+    }
+
+
+def held_certs(master: dict, cert_skills: dict) -> dict:
+    """Only the certifications the master resume actually lists.
+
+    cert_skills.json is a catalogue, not a claim. Without this filter, anyone
+    whose resume lacks a CompTIA cert would still have the prompt tell the model
+    they hold one -- and have the checks accept skills attributed to it.
+    """
+    held_text = " ".join(master.get("certifications", []))
+
+    def held(cert: dict) -> bool:
+        tokens = _cert_name_tokens(cert.get("name", ""))
+        return bool(tokens) and all(
+            re.search(rf"(?<!\w){re.escape(t)}(?!\w)", held_text, flags=re.IGNORECASE)
+            for t in tokens
+        )
+
+    return {**cert_skills, "certs": [c for c in cert_skills.get("certs", []) if held(c)]}
 
 # Ordinary English that happens to appear in exam objectives. Flagging these as
 # "certification knowledge" buries the real leaks in noise, and a check nobody
@@ -408,7 +464,7 @@ def _cert_only_stems(master: dict, cert_skills: dict) -> set[str]:
     cert_only = _content_stems(cert_vocabulary(cert_skills)) - _content_stems(
         _collect_text(master)
     )
-    return {s for s in cert_only - _GENERIC_CERT_STEMS if len(s) >= 4}
+    return {s for s in cert_only - _GENERIC_CERT_STEMS - _LETTER_STEMS if len(s) >= 4}
 
 
 def check_cert_leak(
@@ -421,6 +477,7 @@ def check_cert_leak(
     belongs in competencies or the summary, attributed to the certification.
     """
     cert_only = _cert_only_stems(master, cert_skills)
+    marker = _cert_marker(cert_skills)
     problems: list[str] = []
 
     for master_job, job in zip(master["experience"], tailored.get("experience", [])):
@@ -438,25 +495,60 @@ def check_cert_leak(
         if _normalize(line) in master_competencies:
             continue
         leaked = sorted(_content_stems(line) & cert_only)
-        if leaked and not _CERT_MARKER.search(line):
+        if leaked and not marker.search(line):
             problems.append(
                 f"added competency cites cert-only skills {leaked} without naming "
                 f"the certification: {line!r}"
             )
 
     # In prose, cert knowledge is allowed only where the sentence says it is
-    # certification knowledge.
-    for sentence in re.split(r"(?<=[.!?])\s+", cover_letter):
-        leaked = sorted(_content_stems(sentence) & cert_only)
-        if leaked and not _CERT_MARKER.search(sentence):
-            problems.append(
-                f"cover letter presents cert-attested skills {leaked} as experience: "
-                f"{sentence.strip()!r}"
-            )
+    # certification knowledge. The summary is prose too, and the easiest place
+    # after the cover letter to state cert knowledge as experience.
+    for where, prose in (("summary", tailored.get("summary", "")), ("cover letter", cover_letter)):
+        for sentence in re.split(r"(?<=[.!?])\s+", prose):
+            leaked = sorted(_content_stems(sentence) & cert_only)
+            if leaked and not marker.search(sentence):
+                problems.append(
+                    f"{where} presents cert-attested skills {leaked} as experience: "
+                    f"{sentence.strip()!r}"
+                )
     return problems
 
 
 # ----------------------------------------------------- whole-doc grounding ----
+
+# Ordinary cover-letter phrasing ("I'd welcome the chance to discuss...").
+# None of it describes work performed, so no resume could ever source it and
+# requiring that only makes every letter fail. Words that could carry a claim
+# (tools, duties, "active", "federal", "available") are deliberately absent.
+_LETTER_WORDS = """
+    apply application applying interest interested excited eager enthusiasm bring
+    contribute contribution discuss discussion welcome opportunity thank thanks
+    consideration attention careful carefully sincerely hiring manager dear cover
+    letter chance hear hearing look looking forward value values fit fits believe
+    confident ready glad pleased happy write writing hold focus focused background
+    strength strengths reliable dependable motivated mission organization company
+    join joining grow growth learn learning quickly committed commitment detail
+    details oriented attached enclosed resume review reviewing meet conversation
+    combine combines combined approach environment environments prior potential
+    formal respect respected appreciate today further additional excellent
+    objective objectives earlier offer offers align aligned provide ensure ability
+    success successful effective effectively goals priorities impact people
+    solution solutions process processes plus practical mix help prepared related
+    express request discipline disciplined found
+""".split()
+_LETTER_STEMS = {_stem(w) for w in _LETTER_WORDS}
+
+
+def _proper_name_stems(text: str) -> set[str]:
+    """Stems of capitalized words that don't start a sentence: product, tool,
+    and organization names such as "Kubernetes" or "Okta"."""
+    names: set[str] = set()
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        tokens = re.findall(r"[A-Za-z0-9+#]{3,}", sentence)
+        names.update(_content_stems(" ".join(t for t in tokens[1:] if t != t.lower())))
+    return names
+
 
 def check_grounding(
     master: dict,
@@ -464,18 +556,28 @@ def check_grounding(
     tailored: dict,
     cover_letter: str,
     approved: set[str],
+    job_description: str = "",
+    letter_names: set[str] = frozenset(),
 ) -> list[str]:
-    """Flag prose wording that appears nowhere in the source documents.
+    """Flag wording in the free-form fields that the source documents don't support.
 
     Bullets are excluded here — they get the far stricter per-source check in
-    check_bullet_provenance. This covers the free-form fields, where the model
-    must still stay inside the candidate's own vocabulary.
+    check_bullet_provenance. Tagline, competencies, and projects are dense
+    claims, so every word in them must come from the resume or cert topics.
+
+    The summary and cover letter are prose. Holding every word of prose to the
+    resume's vocabulary rejects ordinary English ("earlier", "offer") and makes
+    most letters fail, so prose is flagged only where fabrication actually
+    comes from: wording lifted from the job description, and capitalized
+    names (tools, products, organizations) found in no source. The letter may
+    also name the employer and role it is addressed to (letter_names).
     """
     allowed = (
         _content_stems(_collect_text(master))
         | _content_stems(cert_vocabulary(cert_skills))
         | approved
     )
+    from_posting = _content_stems(job_description)
 
     warnings: list[str] = []
     checked = [
@@ -489,9 +591,14 @@ def check_grounding(
         checked.append((f"project ({project.get('title', '?')})", project.get("description", "")))
 
     for where, text in checked:
-        novel = sorted(_content_stems(text) - allowed)
+        novel = _content_stems(text) - allowed
+        if where in ("summary", "cover letter"):
+            novel -= _LETTER_STEMS
+            if where == "cover letter":
+                novel -= letter_names
+            novel &= from_posting | _proper_name_stems(text)
         if novel:
-            warnings.append(f"{where}: unsourced wording {novel}")
+            warnings.append(f"{where}: unsourced wording {sorted(novel)}")
     return warnings
 
 
@@ -555,3 +662,52 @@ def flatten_bullets(master: dict, tailored: dict) -> dict:
     ]
     return resume
 
+
+
+# ------------------------------------------------------------ master schema ----
+
+_MASTER_TEXT_FIELDS = ("name", "tagline", "contact", "summary")
+_MASTER_LIST_FIELDS = ("competencies", "certifications", "education")
+
+
+def check_master_schema(master: dict) -> list[str]:
+    """Shape problems that would crash the checks or the renderer.
+
+    The CLI's master is hand-written and the web app's is converted from an
+    upload; either can be malformed, and a precise message beats a TypeError
+    from deep inside a check.
+    """
+    if not isinstance(master, dict):
+        return ["master resume must be a JSON object"]
+    problems: list[str] = []
+
+    def is_text_list(value) -> bool:
+        return isinstance(value, list) and all(isinstance(v, str) for v in value)
+
+    for field in _MASTER_TEXT_FIELDS:
+        if not isinstance(master.get(field), str):
+            problems.append(f'"{field}" must be a string')
+    for field in _MASTER_LIST_FIELDS:
+        if not is_text_list(master.get(field)):
+            problems.append(f'"{field}" must be a list of strings')
+
+    experience = master.get("experience")
+    if not isinstance(experience, list) or not experience:
+        problems.append('"experience" must be a non-empty list of jobs')
+    else:
+        for i, job in enumerate(experience):
+            if not isinstance(job, dict) or not all(
+                isinstance(job.get(k), str) for k in ("title", "org_line")
+            ):
+                problems.append(f'experience[{i}] needs string "title" and "org_line"')
+            elif not is_text_list(job.get("bullets")) or not job["bullets"]:
+                problems.append(f'experience[{i}] "bullets" must be a non-empty list of strings')
+
+    projects = master.get("projects")
+    if not isinstance(projects, list) or not all(
+        isinstance(p, dict) and isinstance(p.get("title"), str)
+        and isinstance(p.get("description"), str)
+        for p in projects
+    ):
+        problems.append('"projects" must be a list of {"title", "description"} objects')
+    return problems

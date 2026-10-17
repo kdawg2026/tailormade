@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     HRFlowable,
     ListFlowable,
@@ -18,6 +22,31 @@ from reportlab.platypus import (
     SimpleDocTemplate,
     Spacer,
 )
+
+
+def _register_pdf_fonts() -> tuple[str, str]:
+    """Embed Cambria so the PDF matches the DOCX; fall back to built-in Times.
+
+    reportlab searches the usual system font folders for these files.
+    """
+    try:
+        pdfmetrics.registerFont(TTFont("Cambria", "cambria.ttc", subfontIndex=0))
+        pdfmetrics.registerFont(TTFont("Cambria-Bold", "cambriab.ttf"))
+    except Exception:  # reportlab raises a bare TTFError or IOError when absent
+        return "Times-Roman", "Times-Bold"
+    return "Cambria", "Cambria-Bold"
+
+
+PDF_FONT, PDF_FONT_BOLD = _register_pdf_fonts()
+
+# Built-in Times only covers Latin-1, and models like non-breaking hyphens
+# ("end‑user"), which would otherwise render as missing-glyph boxes.
+_PDF_FOLD = str.maketrans({"‐": "-", "‑": "-", "−": "-", " ": " "})
+
+
+def esc(text: str) -> str:
+    """Escape text for a reportlab Paragraph, which parses it as markup."""
+    return escape(text.translate(_PDF_FOLD))
 
 
 # ---------------------------------------------------------------- DOCX ----
@@ -31,8 +60,6 @@ def _docx_heading(doc: Document, text: str) -> None:
     run.font.size = Pt(12)
     run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
     # Bottom border under the heading, matching the original resume style.
-    from docx.oxml.ns import qn
-
     p_pr = p._p.get_or_add_pPr()
     borders = p_pr.makeelement(qn("w:pBdr"), {})
     bottom = p_pr.makeelement(
@@ -111,20 +138,17 @@ def build_docx(resume: dict, path: Path) -> None:
 # ----------------------------------------------------------------- PDF ----
 
 def build_pdf(resume: dict, path: Path) -> None:
-    body = ParagraphStyle("body", fontName="Times-Roman", fontSize=10.5, leading=13.5)
+    body = ParagraphStyle("body", fontName=PDF_FONT, fontSize=10.5, leading=13.5)
     name_style = ParagraphStyle(
-        "name", parent=body, fontName="Times-Bold", fontSize=20, leading=24, alignment=1
+        "name", parent=body, fontName=PDF_FONT_BOLD, fontSize=20, leading=24, alignment=1
     )
     center = ParagraphStyle("center", parent=body, alignment=1)
     heading = ParagraphStyle(
-        "heading", parent=body, fontName="Times-Bold", fontSize=12,
+        "heading", parent=body, fontName=PDF_FONT_BOLD, fontSize=12,
         leading=14, spaceBefore=10, spaceAfter=1,
     )
-    job_title = ParagraphStyle("jobTitle", parent=body, fontName="Times-Bold", spaceBefore=6)
-    job_org = ParagraphStyle("jobOrg", parent=body, fontName="Times-Bold")
-
-    def esc(text: str) -> str:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    job_title = ParagraphStyle("jobTitle", parent=body, fontName=PDF_FONT_BOLD, spaceBefore=6)
+    job_org = ParagraphStyle("jobOrg", parent=body, fontName=PDF_FONT_BOLD)
 
     def bullets(items: list[str]) -> ListFlowable:
         return ListFlowable(
@@ -214,15 +238,12 @@ def build_letter_docx(parts: dict, path: Path) -> None:
 
 def build_letter_pdf(parts: dict, path: Path) -> None:
     body_style = ParagraphStyle(
-        "letterBody", fontName="Times-Roman", fontSize=11, leading=15
+        "letterBody", fontName=PDF_FONT, fontSize=11, leading=15
     )
-    bold = ParagraphStyle("letterBold", parent=body_style, fontName="Times-Bold")
+    bold = ParagraphStyle("letterBold", parent=body_style, fontName=PDF_FONT_BOLD)
     name_style = ParagraphStyle(
-        "letterName", parent=body_style, fontName="Times-Bold", fontSize=16, leading=20
+        "letterName", parent=body_style, fontName=PDF_FONT_BOLD, fontSize=16, leading=20
     )
-
-    def esc(text: str) -> str:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     story = [
         Paragraph(esc(parts["name"]), name_style),

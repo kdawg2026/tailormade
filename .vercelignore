@@ -1,0 +1,15 @@
+# Personal data and local-only files never ship.
+resume_master.json
+resume_master_v*.json
+approved_wording.json
+Tailored/
+jd.md
+jd.txt
+*.pdf
+*.docx
+.env
+.env*
+.agents/
+.claude/
+__pycache__/
+skills-lock.json

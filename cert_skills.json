@@ -48,7 +48,7 @@
         "Vulnerability scanning, assessment, and remediation workflows",
         "Security architecture: on-prem, hybrid, and cloud environments; IoT and OT considerations",
         "Zero trust architecture and identity-centric security models",
-        "Identity and access management: authentication, authorization, MFA, SSO, least privilege, RBAC",
+        "Identity and access management (IAM): authentication, authorization, MFA, SSO, least privilege, RBAC",
         "Cryptography fundamentals: encryption at rest/in transit, PKI, certificates, hashing",
         "Security operations: monitoring, SIEM concepts, log analysis, alerting and response",
         "Incident response process: detection, analysis, containment, eradication, recovery, lessons learned",
