@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailormade Documentation</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div>
+      <p class="eyebrow"><a href="/">&larr; Back to Tailormade</a></p>
+      <h1>Documentation</h1>
+      <p>The rules of play, the scorecard, and what happens on a bad lie.</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="how">
+    <h2>How it works</h2>
+    <p>Most AI resume tools rewrite your resume to fit a job posting. The problem is that a model can't tell the difference between "fit the job" and "make things up." Tailormade lets the model re-word what you already did. Then it runs checks that block anything else before any document is made.</p>
+    <ol class="flow">
+      <li><strong>Import.</strong> Your file becomes master-resume JSON. DeepSeek copies the text word for word. Any word that isn't in your file gets flagged as a warning.</li>
+      <li><strong>Tailor.</strong> DeepSeek reorders bullets, competencies, and projects for the job. It rewrites the summary and tagline using only your facts. It also writes a one-paragraph cover letter.</li>
+      <li><strong>Check.</strong> Seven checks run on DeepSeek's answer. If one fails, DeepSeek gets the exact failure and tries again, up to four attempts.</li>
+      <li><strong>Render.</strong> A draft that passes becomes a resume and a cover letter. Each is saved as DOCX and PDF, named after you, the company, and the role.</li>
+    </ol>
+
+    <h3>Bullet modes</h3>
+    <p><strong>Verbatim (default):</strong> Bullets must match your resume exactly. DeepSeek can only change their order. This makes it impossible to invent work in your job history. <strong>Rephrase:</strong> DeepSeek can reword bullets. Each bullet must come from one original bullet in the same job. Each rewrite is checked against that original alone, and it must keep at least half of its key words.</p>
+  </section>
+
+  <section id="checks">
+    <h2>The scorecard: seven checks</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Check</th><th>What it rejects</th></tr>
+      <tr><td>Protected fields</td><td>Changes to your name, contact line, employers, job titles, dates, certifications, education, or project titles. Competency lines can be reordered but not reworded or removed.</td></tr>
+      <tr><td>Bullet provenance</td><td>A bullet that doesn't trace back to one specific bullet in the same job. This stops one employer's wording from showing up under another.</td></tr>
+      <tr><td>Seniority</td><td>Stronger verbs than your original. For example, "assisted" or "maintained" changed to "led", "directed", or "owned".</td></tr>
+      <tr><td>Invented numbers</td><td>Any number your resume doesn't have, such as percentages, headcounts, dollar amounts, or "5+ years". There is no override.</td></tr>
+      <tr><td>Certification leak</td><td>Skills that come only from a certification's exam topics, shown as work experience. These are allowed in competencies, the summary, or the cover letter if the certification is named. Only certifications listed on your resume count.</td></tr>
+      <tr><td>Unverifiable claims</td><td>Claims no document can back up, such as availability, shifts, on-call, lifting, PPE, OSHA, clearances, or relocation. Add these yourself if they're true.</td></tr>
+      <tr><td>Grounding</td><td>Words in the tagline, competencies, or projects that don't appear in your resume or certification topics. In the summary and cover letter, wording copied from the job posting, or a product or tool name, that your resume and certifications don't support. Ordinary phrasing like "I'd welcome the chance" is fine.</td></tr>
+    </table></div>
+
+    <h3>When a run fails</h3>
+    <p>A failure means the checks worked. The message names the check, quotes the problem text, and shows the source line. Run it again, since results vary between runs. If the only flagged words are harmless (like "pragmatic" or "collaborative"), add them to <em>Approved wording</em>. Never approve a word that describes work you didn't do.</p>
+
+    <h3>What it can't do</h3>
+    <p>The checks match words. They confirm that wording comes from your resume, that numbers exist, and that verbs don't get stronger. They don't understand meaning. A sentence made of real words can still suggest something false, so read the output before you send it.</p>
+  </section>
+
+  <section id="privacy">
+    <h2>Privacy &amp; running it</h2>
+    <p>Your account stores your email, a scrypt hash of your password, and your tailor balance. Payments go through Stripe; this site never sees your card. Importing and tailoring send your resume and the job description to the DeepSeek API and nowhere else. DeepSeek is a third-party service, so check its privacy and data-retention terms before you upload a resume. Finished documents are sent straight to your browser and deleted from the server as soon as they are made. Your resume data is saved in this browser's local storage for convenience.</p>
+    <pre>pip install -r requirements.txt uvicorn
+uvicorn app:app --port 8000   # http://127.0.0.1:8000, needs DATABASE_URL and Stripe keys</pre>
+    <p>You can also run the pipeline from the command line: <code>python tailormade.py job.txt --rewrite-bullets</code>. Certification topics come from <code>cert_skills.json</code>. Add entries there for any certifications it doesn't cover yet.</p>
+  </section>
+
+  <footer>
+    <a href="/">Back to Tailormade</a>
+    <span class="hint">Not affiliated with any golf equipment brand.</span>
+  </footer>
+</main>
+</body>
+</html>

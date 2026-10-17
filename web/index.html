@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailormade</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <ellipse cx="32" cy="54" rx="22" ry="6" fill="#0a2214" opacity="0.55"/>
+      <ellipse cx="32" cy="54" rx="7" ry="2.5" fill="#000" opacity="0.6"/>
+      <rect x="31" y="8" width="2.5" height="46" rx="1" fill="#f4f1e8"/>
+      <path d="M33.5 8 L54 15 L33.5 22 Z" fill="#c43b2c"/>
+      <circle cx="18" cy="52" r="4" fill="#fff"/>
+    </svg>
+    <div>
+      <p class="eyebrow">Resume tailoring</p>
+      <h1>Tailormade</h1>
+      <p>Plays your resume as it lies. Tailored to the job, and no part of your experience is invented.</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="app">
+    <div class="card account" id="account">
+      <h3 class="step-title"><span class="ball">0</span><span><small>The clubhouse</small>Your account</span></h3>
+      <form id="auth-form" hidden>
+        <p class="hint">Create an account to get 5 free tailors. No card needed.</p>
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" required>
+        <label for="password">Password <span class="hint">(at least 10 characters)</span></label>
+        <input type="password" id="password" autocomplete="current-password" minlength="10" required>
+        <div class="row tee-row">
+          <button type="submit" id="login">Log in</button>
+          <button type="button" id="signup" class="secondary">Create account</button>
+        </div>
+        <div class="notice bad" id="auth-error"></div>
+      </form>
+      <div id="signed-in" hidden>
+        <p class="row"><strong id="who"></strong><a href="/account">Account settings</a><button type="button" id="logout" class="link">Log out</button></p>
+        <p id="balance" class="balance" aria-live="polite"></p>
+        <div class="notice warn" id="billing-note"></div>
+        <div class="plans">
+          <div class="plan">
+            <h4>15 tailors</h4><p class="price">$10</p><p class="hint">One-time. Never expires.</p>
+            <button type="button" data-plan="pack_15">Buy pack</button>
+          </div>
+          <div class="plan">
+            <h4>45 tailors</h4><p class="price">$22</p><p class="hint">One-time. Never expires.</p>
+            <button type="button" data-plan="pack_45">Buy pack</button>
+          </div>
+          <div class="plan">
+            <h4>Monthly</h4><p class="price">$9<span class="hint">/month</span></p><p class="hint">60 tailors each month. Cancel anytime.</p>
+            <button type="button" data-plan="monthly" id="subscribe">Subscribe</button>
+            <button type="button" id="manage" class="secondary" hidden>Manage subscription</button>
+          </div>
+        </div>
+        <p class="hint">Free tailors are used first, then your monthly allowance, then pack credits. A tailor that fails every check is not charged.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="step-title"><span class="ball">1</span><span><small>Hole 1 · The tee box</small>Your resume</span></h3>
+      <p class="hint">Upload a DOCX, PDF, TXT, or Markdown resume and it converts automatically with DeepSeek to structured data, copying the text exactly. Or upload or paste a master-resume JSON directly. Review the result before tailoring: everything after this step treats it as the truth about you.</p>
+      <div class="row">
+        <label class="file-pick">
+          <input type="file" id="file" accept=".docx,.pdf,.txt,.md,.json">
+          <span class="file-button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Choose resume
+          </span>
+        </label>
+        <span class="file-name" id="file-name" aria-live="polite">DOCX, PDF, TXT, Markdown, or JSON</span>
+      </div>
+      <pre class="log" id="import-log"></pre>
+      <div class="notice warn" id="import-warn"></div>
+      <div class="notice bad" id="import-error"></div>
+      <label for="master">Resume data <span class="hint">(editable JSON, saved in this browser)</span></label>
+      <textarea class="json" id="master" spellcheck="false" placeholder='{"name": "...", "experience": [...], ...}'></textarea>
+    </div>
+
+    <div class="card">
+      <h3 class="step-title"><span class="ball">2</span><span><small>Hole 2 · Read the green</small>Job description</span></h3>
+      <label for="company">Company name <span class="hint">(optional; names your files and the cover letter. Leave blank to use the name in the posting.)</span></label>
+      <input type="text" id="company" autocomplete="organization" maxlength="60" placeholder="e.g. Deloitte">
+      <label for="jd">Job posting</label>
+      <textarea class="jd" id="jd" placeholder="Paste the full job posting here."></textarea>
+    </div>
+
+    <div class="card">
+      <h3 class="step-title"><span class="ball">3</span><span><small>Hole 3 · Tee off</small>Tailor</span></h3>
+      <label class="check"><input type="checkbox" id="rewrite">
+        <span>Allow bullet rephrasing <span class="hint">(off by default: bullet text stays exactly as written and only its order changes. When on, each rewritten bullet is still checked against the original bullet it came from.)</span></span></label>
+      <label for="approve">Approved wording <span class="hint">(comma-separated words you have reviewed and accept, e.g. <code>pragmatic, collaborative</code>)</span></label>
+      <input type="text" id="approve" autocomplete="off">
+      <div class="row tee-row"><button id="tailor" class="tee-off">Tee off</button>
+        <span class="hint">Takes 1–5 minutes. If a draft fails a check, it's retried up to 4 times.</span></div>
+      <div class="progress" id="tailor-progress" role="progressbar" aria-label="Tailoring progress" hidden><div class="bar"></div></div>
+      <div class="notice bad" id="tailor-error"></div>
+      <div class="downloads" id="downloads"></div>
+    </div>
+  </section>
+
+  <footer>
+    <a href="/docs">Documentation</a>
+    <span class="hint">Payments by Stripe. Resumes are processed by DeepSeek. Not affiliated with any golf equipment brand.</span>
+  </footer>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
