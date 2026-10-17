@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account settings · Tailormade</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <ellipse cx="32" cy="54" rx="22" ry="6" fill="#0a2214" opacity="0.55"/>
+      <ellipse cx="32" cy="54" rx="7" ry="2.5" fill="#000" opacity="0.6"/>
+      <rect x="31" y="8" width="2.5" height="46" rx="1" fill="#f4f1e8"/>
+      <path d="M33.5 8 L54 15 L33.5 22 Z" fill="#c43b2c"/>
+      <circle cx="18" cy="52" r="4" fill="#fff"/>
+    </svg>
+    <div>
+      <p class="eyebrow">The clubhouse</p>
+      <h1>Account settings</h1>
+      <p><a href="/">Back to Tailormade</a></p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <p class="notice warn" id="signed-out" hidden>You're not logged in. <a href="/">Log in on the home page</a>.</p>
+
+  <section id="settings" hidden>
+    <div class="card">
+      <h3>Your plan</h3>
+      <p><strong id="who"></strong></p>
+      <p id="balance" class="balance" aria-live="polite"></p>
+      <p id="sub-line" class="hint"></p>
+      <div class="row tee-row">
+        <button type="button" id="cancel-sub" class="secondary" hidden>Cancel monthly plan</button>
+        <button type="button" id="resume-sub" hidden>Keep monthly plan</button>
+        <button type="button" id="billing" class="secondary" hidden>Payment method &amp; receipts</button>
+      </div>
+      <div class="notice bad" id="plan-error"></div>
+    </div>
+
+    <form class="card" id="password-form">
+      <h3>Change password</h3>
+      <label for="current">Current password</label>
+      <input type="password" id="current" autocomplete="current-password" required>
+      <label for="new">New password <span class="hint">(at least 10 characters)</span></label>
+      <input type="password" id="new" autocomplete="new-password" minlength="10" required>
+      <div class="row tee-row"><button type="submit" id="save-password">Change password</button>
+        <span class="hint">Signs you out everywhere else.</span></div>
+      <div class="notice bad" id="password-error"></div>
+      <div class="notice ok" id="password-ok"></div>
+    </form>
+
+    <form class="card danger" id="delete-form">
+      <h3>Delete account</h3>
+      <p>This permanently deletes your account, its remaining tailors (including unused pack tailors, which are not refunded), and your usage history. A monthly plan ends immediately. Stripe keeps its own record of past payments, as the law requires.</p>
+      <label for="delete-password">Enter your password to confirm</label>
+      <input type="password" id="delete-password" autocomplete="current-password" required>
+      <div class="row tee-row"><button type="submit" id="delete" class="danger">Delete my account</button></div>
+      <div class="notice bad" id="delete-error"></div>
+    </form>
+  </section>
+
+  <footer>
+    <a href="/">Tailormade</a>
+    <span class="hint">Payments by Stripe. Resumes are processed by DeepSeek.</span>
+  </footer>
+</main>
+
+<script src="/account.js"></script>
+</body>
+</html>
